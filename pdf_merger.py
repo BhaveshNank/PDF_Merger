@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter
+import os
 
 class PDFEditorGUI:
     def __init__(self, master):
@@ -36,6 +37,14 @@ class PDFEditorGUI:
 
         tk.Button(master, text="Delete Page", command=self.delete_page).grid(row=6, column=1)
 
+        # Section for merging multiple PDFs
+        tk.Label(master, text="Merge PDFs:").grid(row=7, column=0)
+        self.merge_pdfs_listbox = tk.Listbox(master, selectmode=tk.MULTIPLE)
+        self.merge_pdfs_listbox.grid(row=7, column=1)
+        tk.Button(master, text="Add PDF", command=self.add_pdf_to_merge_list).grid(row=7, column=2)
+        tk.Button(master, text="Delete PDF", command=self.delete_selected_pdfs).grid(row=8, column=2)
+        tk.Button(master, text="Merge PDFs", command=self.merge_pdfs).grid(row=9, column=1)
+
     def load_pdf(self, entry_field):
         filename = filedialog.askopenfilename(filetypes=(("PDF files", "*.pdf"), ("All files", "*.*")))
         entry_field.delete(0, tk.END)
@@ -51,12 +60,12 @@ class PDFEditorGUI:
             merger.append(target_pdf)
             merger.merge(insert_page_no, insert_pdf)
 
-            output_pdf = "modified_output.pdf"
+            output_pdf = self.get_unique_filename("modified_output.pdf")
             with open(output_pdf, 'wb') as fout:
                 merger.write(fout)
             merger.close()
 
-            messagebox.showinfo("Success", "PDF inserted successfully!")
+            messagebox.showinfo("Success", f"PDF inserted successfully! Saved as {output_pdf}")
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -72,13 +81,54 @@ class PDFEditorGUI:
                 if i != page_to_delete:
                     writer.add_page(reader.pages[i])
 
-            output_pdf = "modified_output.pdf"
+            base_filename = os.path.splitext(os.path.basename(pdf_path))[0] + "_modified.pdf"
+            output_pdf = self.get_unique_filename(base_filename)
             with open(output_pdf, 'wb') as fout:
                 writer.write(fout)
 
-            messagebox.showinfo("Success", "Page deleted successfully!")
+            messagebox.showinfo("Success", f"Page deleted successfully! Saved as {output_pdf}")
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
+    def add_pdf_to_merge_list(self):
+        filenames = filedialog.askopenfilenames(filetypes=(("PDF files", "*.pdf"), ("All files", "*.*")))
+        for filename in filenames:
+            self.merge_pdfs_listbox.insert(tk.END, filename)
+
+    def delete_selected_pdfs(self):
+        selected_indices = self.merge_pdfs_listbox.curselection()
+        for index in reversed(selected_indices):
+            self.merge_pdfs_listbox.delete(index)
+
+    def merge_pdfs(self):
+        pdf_files = [self.merge_pdfs_listbox.get(idx) for idx in self.merge_pdfs_listbox.curselection()]
+
+        if not pdf_files:
+            messagebox.showerror("Error", "No PDFs selected for merging.")
+            return
+
+        try:
+            merger = PdfMerger()
+            for pdf in pdf_files:
+                merger.append(pdf)
+
+            output_pdf = self.get_unique_filename("merged_output.pdf")
+            with open(output_pdf, 'wb') as fout:
+                merger.write(fout)
+            merger.close()
+
+            messagebox.showinfo("Success", f"PDFs merged successfully! Saved as {output_pdf}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def get_unique_filename(self, base_filename):
+        counter = 1
+        filename, extension = os.path.splitext(base_filename)
+        unique_filename = base_filename
+        while os.path.exists(unique_filename):
+            unique_filename = f"{filename}_{counter}{extension}"
+            counter += 1
+        return unique_filename
 
 def main():
     root = tk.Tk()
